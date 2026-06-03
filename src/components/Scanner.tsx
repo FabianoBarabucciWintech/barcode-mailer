@@ -2,6 +2,10 @@ import { useEffect, useRef, useState } from 'react'
 import { BrowserMultiFormatReader } from '@zxing/browser'
 import { DecodeHintType, BarcodeFormat } from '@zxing/library'
 
+interface Controls {
+  stop: () => void
+}
+
 interface Props {
   onCode: (code: string) => void
   onClose: () => void
@@ -9,7 +13,7 @@ interface Props {
 
 export function Scanner({ onCode, onClose }: Props) {
   const videoRef = useRef<HTMLVideoElement>(null)
-  const readerRef = useRef<BrowserMultiFormatReader | null>(null)
+  const controlsRef = useRef<Controls | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [ready, setReady] = useState(false)
 
@@ -18,30 +22,26 @@ export function Scanner({ onCode, onClose }: Props) {
 
     const hints = new Map()
     hints.set(DecodeHintType.POSSIBLE_FORMATS, [
-      BarcodeFormat.EAN_13,
-      BarcodeFormat.EAN_8,
-      BarcodeFormat.CODE_128,
-      BarcodeFormat.CODE_39,
-      BarcodeFormat.QR_CODE,
-      BarcodeFormat.UPC_A,
-      BarcodeFormat.UPC_E,
-      BarcodeFormat.DATA_MATRIX,
+      BarcodeFormat.EAN_13, BarcodeFormat.EAN_8,
+      BarcodeFormat.CODE_128, BarcodeFormat.CODE_39,
+      BarcodeFormat.QR_CODE, BarcodeFormat.UPC_A,
+      BarcodeFormat.UPC_E, BarcodeFormat.DATA_MATRIX,
     ])
     hints.set(DecodeHintType.TRY_HARDER, true)
 
     const reader = new BrowserMultiFormatReader(hints)
-    readerRef.current = reader
 
     reader.decodeFromVideoDevice(
       undefined,
       videoRef.current!,
-      (result, err, controls) => {
+      (result, _err, controls) => {
         if (!active) { controls.stop(); return }
         if (result) onCode(result.getText())
-        void err
       }
-    ).then(() => {
-      if (active) setReady(true)
+    ).then((controls) => {
+      if (!active) { controls.stop(); return }
+      controlsRef.current = controls
+      setReady(true)
     }).catch((e: Error) => {
       if (!active) return
       if (e.name === 'NotAllowedError') setError('Permesso fotocamera negato.\nConsenti l\'accesso nelle impostazioni del browser.')
@@ -51,7 +51,7 @@ export function Scanner({ onCode, onClose }: Props) {
 
     return () => {
       active = false
-      try { readerRef.current?.reset() } catch {}
+      try { controlsRef.current?.stop() } catch {}
     }
   }, [onCode])
 
@@ -81,11 +81,7 @@ export function Scanner({ onCode, onClose }: Props) {
           </div>
         )}
       </div>
-      {ready && (
-        <p style={{ fontSize: 12, color: '#888', textAlign: 'center', marginBottom: 8 }}>
-          Centra il barcode nel riquadro e tieni fermo il telefono
-        </p>
-      )}
+      {ready && <p style={{ fontSize: 12, color: '#888', textAlign: 'center', marginBottom: 8 }}>Centra il barcode nel riquadro e tieni fermo</p>}
       <button onClick={onClose} style={{ width: '100%', padding: '10px', background: 'none', border: '1px solid #ddd', borderRadius: 8, fontSize: 14, cursor: 'pointer', color: '#666' }}>
         ✕ Ferma fotocamera
       </button>
