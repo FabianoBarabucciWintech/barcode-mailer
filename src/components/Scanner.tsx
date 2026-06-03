@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { BrowserMultiFormatReader } from '@zxing/library'
+import { BrowserMultiFormatReader, Result } from '@zxing/library'
 
 interface Props {
   onCode: (code: string) => void
@@ -30,10 +30,12 @@ export function Scanner({ onCode, onClose }: Props) {
         const reader = new BrowserMultiFormatReader()
         readerRef.current = reader
 
-        reader.decodeFromVideoElement(video, (result, err) => {
+        const controls = await reader.decodeFromVideoElement(video, (result: Result | null) => {
           if (result && active) onCode(result.getText())
-          void err // NotFoundException è normale tra frame
         })
+
+        if (!active) controls.stop()
+
       } catch (e: unknown) {
         if (!active) return
         const err = e as DOMException
@@ -67,11 +69,7 @@ export function Scanner({ onCode, onClose }: Props) {
         {ready && (
           <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', pointerEvents: 'none' }}>
             <div style={{ width: 220, height: 110, border: '2px solid rgba(255,255,255,0.85)', borderRadius: 8, position: 'relative' }}>
-              <div style={{
-                position: 'absolute', left: 0, right: 0, height: 2,
-                background: '#185FA5', top: '50%',
-                animation: 'scanline 1.5s ease-in-out infinite'
-              }} />
+              <div style={{ position: 'absolute', left: 0, right: 0, height: 2, background: '#185FA5', top: '50%', animation: 'scanline 1.5s ease-in-out infinite' }} />
             </div>
           </div>
         )}
