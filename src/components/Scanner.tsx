@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { BrowserMultiFormatReader, Result } from '@zxing/library'
+import { BrowserMultiFormatReader } from '@zxing/library'
 
 interface Props {
   onCode: (code: string) => void
@@ -14,47 +14,33 @@ export function Scanner({ onCode, onClose }: Props) {
 
   useEffect(() => {
     let active = true
+    const reader = new BrowserMultiFormatReader()
+    readerRef.current = reader
 
-    async function start() {
-      try {
-        const stream = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: { ideal: 'environment' }, width: { ideal: 1280 } }
-        })
-        if (!active) { stream.getTracks().forEach(t => t.stop()); return }
-
-        const video = videoRef.current!
-        video.srcObject = stream
-        await video.play()
-        setReady(true)
-
-        const reader = new BrowserMultiFormatReader()
-        readerRef.current = reader
-
-        const controls = await reader.decodeFromVideoElement(video, (result: Result | null) => {
-          if (result && active) onCode(result.getText())
-        })
-
-        if (!active) controls.stop()
-
-      } catch (e: unknown) {
+    reader.decodeFromConstraints(
+      { video: { facingMode: { ideal: 'environment' } } },
+      videoRef.current!,
+      (result, err) => {
         if (!active) return
-        const err = e as DOMException
-        if (err.name === 'NotAllowedError') setError('Permesso fotocamera negato.\nVai nelle impostazioni del browser e consenti l\'accesso alla fotocamera per questa pagina.')
-        else if (err.name === 'NotFoundError') setError('Nessuna fotocamera trovata sul dispositivo.')
-        else setError('Impossibile avviare la fotocamera: ' + err.message)
+        if (result) {
+          onCode(result.getText())
+        }
+        if (err && !(err.message?.includes('No MultiFormat'))) {
+          console.debug('scan:', err.message)
+        }
       }
-    }
-
-    start()
+    ).then(() => {
+      if (active) setReady(true)
+    }).catch((e: Error) => {
+      if (!active) return
+      if (e.name === 'NotAllowedError') setError('Permesso fotocamera negato.\nConsenti l\'accesso nelle impostazioni del browser.')
+      else if (e.name === 'NotFoundError') setError('Nessuna fotocamera trovata.')
+      else setError('Errore fotocamera: ' + e.message)
+    })
 
     return () => {
       active = false
-      if (readerRef.current) { try { readerRef.current.reset() } catch {} readerRef.current = null }
-      if (videoRef.current?.srcObject) {
-        const s = videoRef.current.srcObject as MediaStream
-        s.getTracks().forEach(t => t.stop())
-        videoRef.current.srcObject = null
-      }
+      try { reader.reset() } catch {}
     }
   }, [onCode])
 
