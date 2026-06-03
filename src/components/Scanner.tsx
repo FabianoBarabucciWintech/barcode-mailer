@@ -32,13 +32,9 @@ export function Scanner({ onCode, onClose }: Props) {
         // Abilita autofocus continuo se disponibile
         const track = stream.getVideoTracks()[0]
         try {
-          await track.applyConstraints({
-            // @ts-ignore
-            focusMode: 'continuous',
-            advanced: [{ focusMode: 'continuous' }]
-          })
+          // @ts-ignore
+          await track.applyConstraints({ advanced: [{ focusMode: 'continuous' }] })
         } catch {}
-
         const video = videoRef.current!
         video.srcObject = stream
         await video.play()
